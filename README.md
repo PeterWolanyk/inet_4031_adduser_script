@@ -1,31 +1,104 @@
-INET4031 Add Users Script and User List
+# INET4031 — Add Users Script & User List
 
-Program Description
-The create-users.py script is a Python-based automation tool designed to streamline user account management on Ubuntu. Manually adding dozens of users is inefficient and error-prone; this program automates the process by wrapping standard Linux commands like adduser and passwd into a robust Python loop.
+A Python-based automation tool for bulk user account creation on Ubuntu Linux. Built for INET4031 (Spring 2026).
 
-By reading from a structured input file, the script ensures every user is created with consistent settings, home directories, and group memberships in a fraction of the time.
+---
 
-Program Operation
-The administrator provides a structured input file and executes the script via the terminal. The script parses the input, validates the data fields, and interfaces with system utilities.
+## Overview
 
-Input File Format
-The script reads from a file (typically create-users.input) where each line represents a single user. Fields must be colon-delimited (:) in the following order:
-username:password:lastname:firstname:group1,group2
+Manually provisioning user accounts one at a time is slow and error-prone. `create-users.py` automates the entire process — reading a structured input file and executing the necessary Linux commands to create accounts, set passwords, and assign group memberships in a single pass.
 
-Skipping Lines: Lines beginning with a # are treated as comments and skipped.
+> **Note:** This script manages *users only*. All groups referenced in the input file must already exist on the system before running the script. The script will fail if a group does not exist.
 
-Group Handling: Secondary groups are comma-separated. If a user requires no secondary groups, use a - in the group field.
+---
 
-Validation: Lines missing any of the 5 required fields are automatically ignored to prevent system errors.
+## How It Works
 
-Command Execution
-Before running, ensure the script has execution permissions:
+For each valid entry in the input file, the script executes three system-level operations:
+
+1. **Creates the user** — Runs `adduser` with the provided username, first name, and last name
+2. **Sets the password** — Pipes the password via `echo` into `/usr/bin/passwd` for the target user
+3. **Assigns group membership** — Runs `adduser` again to add the user to each specified group
+
+---
+
+## Input File Format
+
+The script reads from `create-users.input`. Each line represents one user account using colon-delimited fields:
+```
+username:password:lastname:firstname:group1,group2,group3
+```
+
+| Field | Description |
+|---|---|
+| `username` | Login name for the new account |
+| `password` | Initial password |
+| `lastname` | User's last name |
+| `firstname` | User's first name |
+| `groups` | Comma-separated list of existing groups, or `-` for none |
+
+### Examples
+
+**Single group:**
+```
+user01:pass01:Last01:First01:sudo
+```
+
+**Multiple groups:**
+```
+user02:pass02:Last02:First02:sudo,developers
+```
+
+**No groups:**
+```
+user03:pass03:Last03:First03:-
+```
+
+**Skipped line (comment):**
+```
+#user04:pass04:Last04:First04:sudo
+```
+
+### Validation Rules
+
+- Lines beginning with `#` are treated as comments and skipped
+- Lines missing any of the 5 required fields are silently ignored
+- Users that already exist on the system are skipped without notification
+
+---
+
+## Running the Script
+
+### 1. Set execution permissions (first time only)
+```bash
 chmod +x create-users.py
+```
 
-To execute the script and redirect the input file, use:
+### 2. Execute with input file
+```bash
 sudo ./create-users.py < create-users.input
+```
 
-Note: sudo privileges are required as the script modifies /etc/passwd and /etc/group.
+> `sudo` is required — the script writes to `/etc/passwd` and `/etc/group`.
 
-"Dry Run" Safety
-For safety, the script can be run in "Dry Run" mode by commenting out the os.system calls and enabling the print statements. This allows the administrator to verify exactly which commands will be executed before making permanent changes to the server.
+---
+
+## Dry Run Mode
+
+Before making permanent changes, you can verify exactly which commands will be executed without running them. In `create-users.py`, comment out the `os.system(...)` calls and uncomment the corresponding `print(...)` statements. Re-run the script normally — it will output the planned commands to the terminal instead of executing them.
+
+---
+
+## Verifying Results
+
+After running the script, confirm that users and groups were created correctly:
+
+**Check user account:**
+```bash
+grep <username> /etc/passwd
+```
+
+**Check group membership:**
+```bash
+grep <username> /etc/group
+```
